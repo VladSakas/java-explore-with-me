@@ -1,2 +1,39 @@
-# java-explore-with-me
-Template repository for ExploreWithMe project.
+# Explore With Me
+
+Дипломный проект: афиша событий, где пользователи делятся мероприятиями и находят компанию.
+
+## Сервисы
+
+- **stats-server** — сервис статистики (порт 9090)
+- **stats-client** — HTTP-клиент для сервиса статистики
+- **common** — общие DTO
+
+## Стек
+
+- Java 21
+- Spring Boot 3.3.2
+- PostgreSQL 16.1
+- Maven (многомодульный)
+- Docker / Docker Compose
+
+## Запуск
+
+```bash
+mvn clean package -DskipTests
+docker-compose up --build
+```
+
+## API сервиса статистики
+
+- `POST /hit` — сохранить информацию о запросе
+- `GET /stats?start={start}&end={end}&uris={uris}&unique={unique}` — получить статистику
+
+## Дополнительная функциональность
+
+**Выбранная будущая фича:** Рейтинги событий и их авторов.
+
+## Этапы
+
+- [x] Этап 1. Сервис статистики
+- [ ] Этап 2. Основной сервис
+- [ ] Этап 3. Дополнительная функциональность
