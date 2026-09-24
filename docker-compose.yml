@@ -36,10 +36,10 @@ services:
       - ewm-network
 
    # основной сервис
-  ewm-main-service:
+  ewm-service:
     build: ewm-main-service
     image: ewm-main-service
-    container_name: ewm-main-service
+    container_name: ewm-service
     ports:
       - "8080:8080"
     depends_on:
