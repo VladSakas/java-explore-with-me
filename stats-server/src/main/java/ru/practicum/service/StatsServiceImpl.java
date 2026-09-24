@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.dto.EndpointHit;
 import ru.practicum.dto.ViewStats;
+import ru.practicum.exception.BadRequestException;
 import ru.practicum.model.StatsEntity;
 import ru.practicum.repository.StatsRepository;
 
@@ -36,7 +37,7 @@ public class StatsServiceImpl implements StatsService {
     @Override
     public List<ViewStats> getStats(LocalDateTime start, LocalDateTime end, List<String> uris, boolean unique) {
         if (start.isAfter(end)) {
-            throw new IllegalArgumentException("Дата начала не может быть позже даты окончания");
+            throw new BadRequestException("Start date must be before end date");
         }
         if (unique) {
             return statsRepository.findUniqueStats(start, end, uris);

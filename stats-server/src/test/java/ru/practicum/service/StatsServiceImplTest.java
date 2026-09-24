@@ -8,6 +8,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import ru.practicum.dto.EndpointHit;
 import ru.practicum.dto.ViewStats;
+import ru.practicum.exception.BadRequestException;
 import ru.practicum.model.StatsEntity;
 import ru.practicum.repository.StatsRepository;
 
@@ -82,7 +83,7 @@ class StatsServiceImplTest {
     void getStats_whenStartAfterEnd_shouldThrowException() {
         LocalDateTime badStart = end.plusDays(1);
 
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(BadRequestException.class,
                 () -> statsService.getStats(badStart, end, null, false));
     }
 }
