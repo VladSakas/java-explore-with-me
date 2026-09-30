@@ -748,31 +748,31 @@
   "variable": [
     {
       "key": "baseUrl",
-      "value": ""
+      "value": "http://localhost:8080"
     },
     {
       "key": "initiatorId",
-      "value": ""
+      "value": "1"
     },
     {
       "key": "participantId",
-      "value": ""
+      "value": "2"
     },
     {
       "key": "outsiderId",
-      "value": ""
+      "value": "3"
     },
     {
       "key": "categoryId",
-      "value": ""
+      "value": "1"
     },
     {
       "key": "eventId",
-      "value": ""
+      "value": "1"
     },
     {
       "key": "requestId",
-      "value": ""
+      "value": "1"
     }
   ]
 }
