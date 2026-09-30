@@ -15,6 +15,7 @@ import ru.practicum.model.Event;
 import ru.practicum.model.EventState;
 import ru.practicum.model.RequestStatus;
 import ru.practicum.repository.EventRepository;
+import ru.practicum.repository.RatingRepository;
 import ru.practicum.repository.RequestRepository;
 
 import java.time.LocalDateTime;
@@ -35,6 +36,7 @@ public class PublicEventServiceImpl implements PublicEventService {
     private final RequestRepository requestRepository;
     private final EventMapper eventMapper;
     private final StatsClient statsClient;
+    private final RatingRepository ratingRepository;
 
     @Override
     public List<EventShortDto> getEvents(String text,
@@ -62,6 +64,8 @@ public class PublicEventServiceImpl implements PublicEventService {
 
         Map<Long, Long> confirmedMap = loadConfirmedRequests(events);
 
+        Map<Long, Long> ratingsMap = loadRatings(events);
+
         if (Boolean.TRUE.equals(onlyAvailable)) {
             events = events.stream()
                     .filter(e -> isAvailable(e, confirmedMap.getOrDefault(e.getId(), 0L)))
@@ -71,6 +75,9 @@ public class PublicEventServiceImpl implements PublicEventService {
         if ("VIEWS".equals(sort)) {
             events.sort(Comparator.comparingLong(
                     (Event e) -> viewsMap.getOrDefault(e.getId(), 0L)).reversed());
+        } else if ("RATING".equals(sort)) {
+            events.sort(Comparator.comparingLong(
+                    (Event e) -> ratingsMap.getOrDefault(e.getId(), 0L)).reversed());
         } else {
             events.sort(Comparator.comparing(Event::getEventDate));
         }
@@ -84,6 +91,7 @@ public class PublicEventServiceImpl implements PublicEventService {
                     EventShortDto dto = eventMapper.toShortDto(e);
                     dto.setViews(viewsMap.getOrDefault(e.getId(), 0L));
                     dto.setConfirmedRequests(confirmedMap.getOrDefault(e.getId(), 0L));
+                    dto.setRating(ratingsMap.get(e.getId()));
                     return dto;
                 })
                 .collect(Collectors.toList());
@@ -91,7 +99,6 @@ public class PublicEventServiceImpl implements PublicEventService {
 
     @Override
     public EventFullDto getEvent(Long eventId, String ip) {
-        // Сохраняем hit
         statsClient.saveHit(APP_NAME, "/events/" + eventId, ip, LocalDateTime.now());
 
         Event event = eventRepository.findById(eventId)
@@ -104,6 +111,7 @@ public class PublicEventServiceImpl implements PublicEventService {
         EventFullDto dto = eventMapper.toFullDto(event);
         dto.setViews(loadViews(List.of(event)).getOrDefault(eventId, 0L));
         dto.setConfirmedRequests(requestRepository.countByEventIdAndStatus(eventId, RequestStatus.CONFIRMED));
+        dto.setRating(ratingRepository.findRatingByEventId(eventId));
         return dto;
     }
 
@@ -140,5 +148,22 @@ public class PublicEventServiceImpl implements PublicEventService {
 
     private boolean isAvailable(Event event, long confirmed) {
         return event.getParticipantLimit() == 0 || confirmed < event.getParticipantLimit();
+    }
+
+    private Map<Long, Long> loadRatings(List<Event> events) {
+        if (events.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Long> eventIds = events.stream()
+                .map(Event::getId)
+                .collect(Collectors.toList());
+
+        List<Object[]> rows = ratingRepository.findRatingsByEventIds(eventIds);
+
+        return rows.stream()
+                .collect(Collectors.toMap(
+                        row -> (Long) row[0],
+                        row -> (Long) row[1]));
     }
 }

@@ -19,14 +19,12 @@ import ru.practicum.exception.NotFoundException;
 import ru.practicum.mapper.EventMapper;
 import ru.practicum.mapper.RequestMapper;
 import ru.practicum.model.*;
-import ru.practicum.repository.CategoryRepository;
-import ru.practicum.repository.EventRepository;
-import ru.practicum.repository.RequestRepository;
-import ru.practicum.repository.UserRepository;
+import ru.practicum.repository.*;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -41,14 +39,22 @@ public class PrivateEventServiceImpl implements PrivateEventService {
     private final RequestRepository requestRepository;
     private final EventMapper eventMapper;
     private final RequestMapper requestMapper;
+    private final RatingRepository ratingRepository;
 
     @Override
     public List<EventShortDto> getUserEvents(Long userId, int from, int size) {
         checkUserExists(userId);
         Pageable pageable = PageRequest.of(from / size, size);
         List<Event> events = eventRepository.findAllByInitiatorId(userId, pageable);
+        Map<Long, Long> ratingsMap = loadRatings(events);
         return events.stream()
-                .map(eventMapper::toShortDto)
+                .map(event -> {
+                    EventShortDto dto = eventMapper.toShortDto(event);
+                    dto.setConfirmedRequests(
+                            requestRepository.countByEventIdAndStatus(event.getId(), RequestStatus.CONFIRMED));
+                    dto.setRating(ratingsMap.get(event.getId()));
+                    return dto;
+                })
                 .collect(Collectors.toList());
     }
 
@@ -73,7 +79,11 @@ public class PrivateEventServiceImpl implements PrivateEventService {
 
         Event saved = eventRepository.save(event);
         log.info("Создано событие: id={}, state={}", saved.getId(), saved.getState());
-        return eventMapper.toFullDto(saved);
+
+        EventFullDto dto = eventMapper.toFullDto(saved);
+        dto.setConfirmedRequests(0L);
+        dto.setRating(null);
+        return dto;
     }
 
     @Override
@@ -81,7 +91,11 @@ public class PrivateEventServiceImpl implements PrivateEventService {
         checkUserExists(userId);
         Event event = eventRepository.findByIdAndInitiatorId(eventId, userId)
                 .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
-        return eventMapper.toFullDto(event);
+        EventFullDto dto = eventMapper.toFullDto(event);
+        dto.setConfirmedRequests(
+                requestRepository.countByEventIdAndStatus(eventId, RequestStatus.CONFIRMED));
+        dto.setRating(ratingRepository.findRatingByEventId(eventId));
+        return dto;
     }
 
     @Override
@@ -100,7 +114,12 @@ public class PrivateEventServiceImpl implements PrivateEventService {
 
         Event updated = eventRepository.save(event);
         log.info("Обновлено событие пользователем: id={}, state={}", updated.getId(), updated.getState());
-        return eventMapper.toFullDto(updated);
+
+        EventFullDto dto = eventMapper.toFullDto(updated);
+        dto.setConfirmedRequests(
+                requestRepository.countByEventIdAndStatus(updated.getId(), RequestStatus.CONFIRMED));
+        dto.setRating(ratingRepository.findRatingByEventId(updated.getId()));
+        return dto;
     }
 
     private void applyUserUpdates(Event event, UpdateEventUserRequest request) {
@@ -234,5 +253,22 @@ public class PrivateEventServiceImpl implements PrivateEventService {
         if (!userRepository.existsById(userId)) {
             throw new NotFoundException("User with id=" + userId + " was not found");
         }
+    }
+
+    private Map<Long, Long> loadRatings(List<Event> events) {
+        if (events.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Long> eventIds = events.stream()
+                .map(Event::getId)
+                .collect(Collectors.toList());
+
+        List<Object[]> rows = ratingRepository.findRatingsByEventIds(eventIds);
+
+        return rows.stream()
+                .collect(Collectors.toMap(
+                        row -> (Long) row[0],
+                        row -> (Long) row[1]));
     }
 }

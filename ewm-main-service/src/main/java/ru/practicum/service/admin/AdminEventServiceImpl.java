@@ -15,10 +15,12 @@ import ru.practicum.mapper.EventMapper;
 import ru.practicum.model.*;
 import ru.practicum.repository.CategoryRepository;
 import ru.practicum.repository.EventRepository;
+import ru.practicum.repository.RatingRepository;
 import ru.practicum.repository.RequestRepository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -31,6 +33,7 @@ public class AdminEventServiceImpl implements AdminEventService {
     private final CategoryRepository categoryRepository;
     private final EventMapper eventMapper;
     private final RequestRepository requestRepository;
+    private final RatingRepository ratingRepository;
 
     @Override
     public List<EventFullDto> getEvents(List<Long> users,
@@ -55,12 +58,13 @@ public class AdminEventServiceImpl implements AdminEventService {
         List<Event> events = eventRepository.findEventsForAdmin(
                 users, stateEnums, categories, rangeStart, rangeEnd, pageable);
 
+        Map<Long, Long> ratingsMap = loadRatings(events);
         return events.stream()
                 .map(event -> {
                     EventFullDto dto = eventMapper.toFullDto(event);
                     dto.setConfirmedRequests(
                             requestRepository.countByEventIdAndStatus(event.getId(), RequestStatus.CONFIRMED));
-                    dto.setViews(0L);
+                    dto.setRating(ratingsMap.get(event.getId()));
                     return dto;
                 })
                 .collect(Collectors.toList());
@@ -77,7 +81,12 @@ public class AdminEventServiceImpl implements AdminEventService {
 
         Event updated = eventRepository.save(event);
         log.info("Обновлено событие: id={}, state={}", updated.getId(), updated.getState());
-        return eventMapper.toFullDto(updated);
+
+        EventFullDto dto = eventMapper.toFullDto(updated);
+        dto.setConfirmedRequests(
+                requestRepository.countByEventIdAndStatus(updated.getId(), RequestStatus.CONFIRMED));
+        dto.setRating(ratingRepository.findRatingByEventId(updated.getId()));
+        return dto;
     }
 
     private void applyUpdates(Event event, UpdateEventAdminRequest request) {
@@ -154,5 +163,22 @@ public class AdminEventServiceImpl implements AdminEventService {
         } catch (IllegalArgumentException e) {
             throw new BadRequestException("Неизвестный статус: " + state);
         }
+    }
+
+    private Map<Long, Long> loadRatings(List<Event> events) {
+        if (events.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Long> eventIds = events.stream()
+                .map(Event::getId)
+                .collect(Collectors.toList());
+
+        List<Object[]> rows = ratingRepository.findRatingsByEventIds(eventIds);
+
+        return rows.stream()
+                .collect(Collectors.toMap(
+                        row -> (Long) row[0],
+                        row -> (Long) row[1]));
     }
 }
